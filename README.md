@@ -22,10 +22,9 @@ The host machine must satisfy the following minimum requirements:
 ### 1. Updating and Installing Dependencies
 
 This section updates the package lists and installs the necessary dependencies for the setup
-<sub>
-   sudo apt update -y && sudo apt-get full-upgrade -y
-   sudo apt install -y python3-dev libffi-dev gcc libssl-dev python3-selinux python3-setuptools python3-venv net-tools git
-</sub>
+
+sudo apt update -y && sudo apt-get full-upgrade -y
+sudo apt install -y python3-dev libffi-dev gcc libssl-dev python3-selinux python3-setuptools python3-venv net-tools git
 
 
 ### 2. Setting Up Python Virtual Environment
