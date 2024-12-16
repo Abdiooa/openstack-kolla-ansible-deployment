@@ -179,7 +179,7 @@ kolla-ansible destroy --yes-i-really-really-mean-it -i ./all-in-one  # Destroy p
 
 log_message "Generating new certificates..."
 kolla-ansible certificates -i ./all-in-one  # Optionally generate new certificates
-sudo cp /etc/kolla/certificates/ca/root.crt /usr/local/share/ca-certificates/kolla-root.crt
+sudo cp /etc/kolla/certificates/ca/root.crt /usr/local/share/ca-certificates/kolla-root.crt # important if making it https
 sudo update-ca-certificates
 
 
@@ -191,6 +191,7 @@ kolla-ansible prechecks -i ./all-in-one  # Run prechecks before deploying
 
 log_message "Running Deployment..."
 kolla-ansible deploy -i ./all-in-one
+
 
 
 log_message "Running Post Deployment..."
