@@ -18,7 +18,7 @@ The host machine must satisfy the following minimum requirements:
 
 
 ## Step-by-Step OpenStack all-in-one Deployment
-## [!WARNING] You do not need to do the steps, after understanding them, you can easily run the script and she will the job for you
+## [!WARNING] You do not need to do the steps, after understanding them, you can easily run the script and she will do the job for you
 here how to run it
 ```
 sudo chmod +x ./filescriptname.sh
