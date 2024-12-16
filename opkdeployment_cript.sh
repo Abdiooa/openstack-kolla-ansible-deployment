@@ -204,4 +204,4 @@ pip install python-neutronclient -c https://releases.openstack.org/constraints/u
 
 pip install python-glanceclient -c https://releases.openstack.org/constraints/upper/2024.1
 
-pip install python-heatclient -c https://releases.openstack.org/constraints/upper/2024.1"
+pip install python-heatclient -c https://releases.openstack.org/constraints/upper/2024.1
