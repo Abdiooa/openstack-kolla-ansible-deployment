@@ -4,9 +4,9 @@ This documentation explains how to deploy OpenStack using Kolla-Ansible, a tool 
 
 ### Prerequisites
 
---> A system running Ubuntu (or a compatible distribution).
---> Sudo privileges for the installation of dependencies.
---> Basic knowledge of Linux commands and system administration.
+  - A system running Ubuntu (or a compatible distribution).
+  - Sudo privileges for the installation of dependencies.
+  - Basic knowledge of Linux commands and system administration.
 
 ### Host machine requirements
 
