@@ -31,12 +31,11 @@ source "$VENV_DIR/bin/activate"  # Activate the virtual environment
 
 # Upgrade pip and install required Python packages
 log_message "Upgrading pip and installing wheel..."
-sudo apt install -y python3-docker  # Install Docker Python package
 pip install -U pip  # Upgrade pip
 pip install wheel  # Install wheel for package building
 
 
-log_message "docker setup"l
+log_message "docker setup"
 sudo apt update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
