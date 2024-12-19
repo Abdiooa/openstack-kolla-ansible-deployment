@@ -34,12 +34,17 @@ log_message "Upgrading pip and installing wheel..."
 sudo apt install -y python3-docker  # Install Docker Python package
 pip install -U pip  # Upgrade pip
 pip install wheel  # Install wheel for package building
-sudo apt-get install libdbus-1-dev libdbus-glib-1-dev  # Install additional dependencies for DBus
-pip3 install autokey  # Install autokey Python package
 
-# Install additional packages
-pip install dbus-python  # DBus bindings for Python
-pip install docker  # Docker SDK for Python
+
+log_message "docker setup"l
+sudo apt update
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+sudo apt update
+sudo apt update
+sudo usermod -aG docker ${USER}
+docker --version
+
 #sudo apt install docker.io -y  # Optionally install Docker if not installed
 
 log_message "Setup complete."
