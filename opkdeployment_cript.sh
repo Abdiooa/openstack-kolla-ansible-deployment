@@ -39,10 +39,10 @@ log_message "docker setup"
 sudo apt update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
-sudo apt update
+sudo apt install docker-ce -y
 sudo usermod -aG docker ${USER}
-docker --version
 
 #sudo apt install docker.io -y  # Optionally install Docker if not installed
 
@@ -109,7 +109,6 @@ my_br_ip=$(ifconfig enp0s8 | egrep -o 'inet [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.
 br2_ip=$(ifconfig enp0s9 | egrep -o 'inet [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'  | cut -d' ' -f2)
 
 echo $my_br_ip  # Display internal IP address
-echo $br2_ip  # Display external IP address
 
 # Configure Kolla globals.yml with detected internal IP address
 log_message "Configuring Kolla globals.yml..."
@@ -166,7 +165,7 @@ source kolla-venv/bin/activate  # Re-activate the virtual environment for deploy
 log_message " Installing Ansible Galaxy dependencies..."
 kolla-ansible install-deps  # Install required dependencies for Kolla-Ansible
 
-echo docker --version  # Check Docker version
+docker --version  # Check Docker version
 
 # Add devops user to docker group (if not already added)
 log_message "Adding devops user to the docker group..."
