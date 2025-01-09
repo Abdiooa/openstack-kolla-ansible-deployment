@@ -1,0 +1,256 @@
+heat_template_version: 2016-10-14
+description: Auto-scaling with a Flask web server, scaling policies, and alarms
+
+parameters:
+  server_name:
+    type: string
+    description: "The server name"
+    default: "flask-server"
+
+  image_id:
+    type: string
+    description: "The ID of the image to use for the server"
+
+  flavor_id:
+    type: string
+    description: "The flavor ID to use for the server"
+    default: "m1.small"
+
+  network_id:
+    type: string
+    description: "The network ID to attach the server to"
+
+  subnet_id:
+    type: string
+    description: "The network ID to attach the load balancer to"
+
+  external_network:
+    type: string
+    description: "The external network used for floating IPs"
+    default: "public1"
+
+  min_size:
+    type: number
+    description: "Minimum number of instances in the auto-scaling group"
+    default: 1
+
+  max_size:
+    type: number
+    description: "Maximum number of instances in the auto-scaling group"
+    default: 5
+
+  key_name:
+    type: string
+    description: "The name of the key pair to use for SSH access"
+
+resources:
+  # Define the server instance group for auto-scaling
+  instance_group:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      cooldown: 300
+      desired_capacity: {get_param: min_size}
+      max_size: {get_param: max_size}
+      min_size: {get_param: min_size}
+      resource:
+        type: OS::Nova::Server
+        properties:
+          name: {get_param: server_name}
+          image: {get_param: image_id}
+          flavor: {get_param: flavor_id}
+          key_name: {get_param: key_name}
+          networks:
+            - port: {get_resource: server_port}
+          user_data: |
+            #!/bin/bash
+            sudo apt update
+            sudo apt install -y python3-pip
+            pip3 install flask
+            cat <<EOF > app.py
+            from flask import Flask, request, jsonify
+            import time
+
+            app = Flask(__name__)
+
+            # A simple route for the home page
+            @app.route('/')
+            def home():
+                return "Welcome to the Flask Web Server!"
+
+            # A health check endpoint for load balancers
+            @app.route('/health', methods=['GET'])
+            def health_check():
+                return jsonify({"status": "healthy"}), 200
+
+            # Simulate workload
+            @app.route('/workload', methods=['POST'])
+            def workload():
+                duration = request.json.get('duration', 1)
+                start = time.time()
+                while time.time() - start < duration:
+                    pass  # Simulate CPU-intensive task
+                return jsonify({"message": "Workload processed"}), 200
+
+            if __name__ == '__main__':
+                app.run(host='0.0.0.0', port=8082)
+            EOF
+            python3 app.py &
+
+  # Define the network port for the server
+  server_port:
+    type: OS::Neutron::Port
+    properties:
+      network: {get_param: network_id}
+      security_groups:
+        - default
+
+  # Define the floating IP for external access
+  floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: {get_param: external_network}
+
+  # Associate the floating IP with the server's port
+  floating_ip_assoc:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: {get_resource: floating_ip}
+      port_id: {get_resource: server_port}
+
+  # Load Balancer
+  loadbalancer:
+    type: OS::Octavia::LoadBalancer
+    properties:
+      name: webservers-loadbalancer
+      vip_subnet: {get_param: subnet_id}
+
+  # Listener
+  lb_listener:
+    type: OS::Octavia::Listener
+    properties:
+      protocol: TCP
+      protocol_port: 8082
+      loadbalancer: {get_resource: loadbalancer}
+      name: "listener1"
+
+  # Pool
+  lb_pool:
+    type: OS::Octavia::Pool
+    properties:
+      protocol: TCP
+      lb_algorithm: ROUND_ROBIN
+      listener: {get_resource: lb_listener}
+      name: "pool1"
+
+  # Health monitor
+  lb_health_monitor:
+    type: OS::Octavia::HealthMonitor
+    properties:
+      pool: {get_resource: lb_pool}
+      type: TCP
+      delay: 15
+      timeout: 10
+      max_retries: 4
+
+  # Floating IP for load balancer
+  lb_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: {get_param: external_network}
+
+  # Add back-end members dynamically
+  lb_members:
+    type: OS::Heat::ResourceGroup
+    properties:
+      count: {get_param: max_size}
+      resource_def:
+        type: OS::Octavia::PoolMember
+        properties:
+          address: {get_attr: [instance_group, attributes, fixed_ips, 0, ip_address]}
+          protocol_port: 8082
+          pool: {get_resource: lb_pool}
+
+  # Associate the floating IP with the load balancer's VIP
+  lb_floating_ip_assoc:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: {get_resource: lb_floating_ip}
+      port_id: {get_attr: [loadbalancer, vip_port_id]}
+
+  # Scaling policies for the server group
+  scaleout_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: instance_group}
+      cooldown: 120
+      scaling_adjustment: 1
+
+  scalein_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: instance_group}
+      cooldown: 120
+      scaling_adjustment: -1
+
+  # Request rate high alarm (scale-out trigger)
+  request_alarm_high:
+    type: OS::Aodh::GnocchiAggregationByResourcesAlarm
+    properties:
+      description: "Scale out if requests per second > 100"
+      metric: requests_per_second
+      aggregation_method: rate:mean
+      granularity: 60
+      evaluation_periods: 2
+      threshold: 100
+      resource_type: instance
+      comparison_operator: gt
+      alarm_actions:
+        - str_replace:
+            template: trust+url
+            params:
+              url: {get_attr: [scaleout_policy, alarm_url]}
+      query:
+        str_replace:
+          template: '{"=": {"server_group": "stack_id"}}'
+          params:
+            stack_id: {get_param: "OS::stack_id"}
+
+  # Request rate low alarm (scale-in trigger)
+  request_alarm_low:
+    type: OS::Aodh::GnocchiAggregationByResourcesAlarm
+    properties:
+      description: "Scale in if requests per second < 20"
+      metric: requests_per_second
+      aggregation_method: rate:mean
+      granularity: 20
+      evaluation_periods: 2
+      threshold: 10
+      resource_type: instance
+      comparison_operator: lt
+      alarm_actions:
+        - str_replace:
+            template: trust+url
+            params:
+              url: {get_attr: [scalein_policy, alarm_url]}
+      query:
+        str_replace:
+          template: '{"=": {"server_group": "stack_id"}}'
+          params:
+            stack_id: {get_param: "OS::stack_id"}
+
+outputs:
+  lb_floating_ip:
+    description: "Floating IP of the load balancer"
+    value: {get_attr: [lb_floating_ip, floating_ip_address]}
+
+  instance_ips:
+    description: "IP addresses of the instances"
+    value: {get_attr: [instance_group, attributes, fixed_ips]}
+
+  scaleout_policy_signal_url:
+    value: {get_attr: [scaleout_policy, alarm_url]}
+
+  scalein_policy_signal_url:
+    value: {get_attr: [scalein_policy, alarm_url]}
